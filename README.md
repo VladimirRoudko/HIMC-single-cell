@@ -21,3 +21,11 @@ Metadata file is common for all samples from one dataset
 
 All input files has to be comma separated csv format.
 
+
+SQL database stores all data in merged tables:
+
+expression
+celltypes
+genes
+metadata
+
