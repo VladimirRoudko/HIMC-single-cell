@@ -29,3 +29,4 @@ celltypes
 genes
 metadata
 
+Each table is indexed and compressed (?) and has numbered IDs to match infomration
