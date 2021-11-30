@@ -4,37 +4,10 @@ library(shinydashboard)
 library(data.table)
 library(tidyverse)
 library(DT)
-library(odbc)
-library(RMariaDB)
-library(pool)
-library(dbplyr)
 
 source("database.R")
 source("visuals.R")
-
-#setwd("~/Documents/data/research/mount.sinai/HIMC/database/development")
-
-psswd <- .rs.askForPassword("Database Password:")  
-uid <- .rs.askForPassword("Database userID:") 
-
-con_himc <- dbPool(
-  odbc::odbc(),
-  drv = RMariaDB::MariaDB(), 
-  username = uid,
-  password = psswd, 
-  host = "data1.hpc.mssm.edu", 
-  port = 3306,
-  dbname = "himc_data1"
-)
-
-#### add column with sample of origin
-database <- dbListTables(con_himc)
-inputGeneNames <- get_input_gene_list(con_himc) %>% collect()
-inputCellTypes <- get_input_cell_list(con_himc) %>% collect()
-inputDatasetsSamples <- get_input_dataset_sample_list(con_himc) %>% collect()
-inputMetaData <- get_input_metadata(con_himc) %>% as_tibble() %>% spread(term, value)
-
-length(inputGeneNames %>% select(gene) %>% unique() %>% as_vector())
+source("global.R")
 
 
 ui <- dashboardPage(
@@ -45,14 +18,15 @@ ui <- dashboardPage(
       id = "tab",
       menuItem("Metadata Dashboard", icon = icon("dashboard"), tabName = "dashboard"),
       menuItem("Gene Expression", icon = icon("bar-chart-o"),
-               menuSubItem("Dot Plot", tabName = "exprDot"),
-               menuSubItem("Density Plot", tabName = "exprDensity"),
-               menuSubItem("Box Plot", tabName = "exprBox"),
-               menuSubItem("Heatmap", tabName = "pairwase")
+               menuSubItem("Dot", tabName = "exprDot"),
+               menuSubItem("Density", tabName = "exprDensity"),
+               menuSubItem("Box", tabName = "exprBox"),
+               menuSubItem("Heatmap averages", tabName = "heatmap")
       ),
-      menuItem("Cell Fraction", icon = icon("calculator"),
-               menuSubItem("Box Plot", tabName = "boxFraction"),
-               menuSubItem("Stacked Bar Plot", tabName = "barFraction")
+      menuItem("Cell Counts", icon = icon("calculator"),
+               menuSubItem("Dataset overview", tabName = "boxCell"),
+               menuSubItem("Selection subsets", tabName = "barCell"),
+               menuSubItem("Metadata subsets", tabName = "metaCell")
       ),
       menuItem("DE Genes", icon = icon("dna"),
                menuSubItem("Box Plot", tabName = "boxDE"),
@@ -67,7 +41,7 @@ ui <- dashboardPage(
     br(),
     conditionalPanel(condition = "input.tab != 'dashboard'",
                      selectizeInput(
-                       'dataset', label='1. Select dataset:', choices = inputDatasetsSamples$dataset, multiple = TRUE
+                       'dataset', label='1. Select dataset:', choices = inputDatasets$dataset, multiple = TRUE
                      ),
                      selectizeInput(
                        'sample', label='2. Select sample:', choices = NULL, multiple = TRUE
@@ -91,7 +65,7 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 column(12,align="center",
-                       selectInput('updateInfo', label='Update Dataset Info', choices = inputDatasetsSamples$dataset, multiple = TRUE)
+                       selectInput('updateInfo', label='Update Dataset Info', choices = inputDatasets %>% select(dataset), multiple = TRUE)
                 )
               ),
               fluidRow(
@@ -141,25 +115,31 @@ ui <- dashboardPage(
                 )
               )
       ),
-      tabItem("pairwase", 
+      tabItem("heatmap", 
               fluidRow(
-                box(title = "Pairwase Scatter Plot", status = "primary", width = 12, #height ="90vh", 
+                box(title = "Heatmap Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
                     # plotlyOutput('dot', height ="90vh")
                     "Here will be plot"
                 )
               )
       ),
-      tabItem("boxFraction", 
+      tabItem("boxCell", 
               fluidRow(
                 box(title = "Cell Fraction Box Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    #plotlyOutput('dot', height ="85vh")
-                    "Here will be plot"
+#                    div(style="display:inline-block;width:20%;text-align: center;",
+#                        actionButton(inputId = "box",label = "Group by cell type")),
+#                    div(style="display:inline-block;width:30%;text-align: center;",
+#                        actionButton(inputId = "boxPerGene",label = "Group by gene name")),
+                    br(),br(),
+                    plotlyOutput('countBox', height ="85vh"),
+                    br(),br(),
+                    DTOutput('countTable',height = "40vh") #,height = "85vh"
                 )
               )
       ),
-      tabItem("barFraction", 
+      tabItem("barCell", 
               fluidRow(
                 box(title = "Cell Fraction Bar Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
@@ -211,13 +191,23 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   
+  ## exit SQL connection and stop App upon session termination:
+  
+  session$onSessionEnded(function() {
+    cat("closing connection and exiting app")
+    poolClose(con_himc)
+    stopApp()
+  })
+  
+  cdata <- session$clientData
+  
   #### info Dashboard part
   
   updateDatasetInfo <- reactive({
     if (length(input$updateInfo) == 0) {
-      tags$p(paste(length(inputDatasetsSamples %>% select(dataset) %>% unique() %>% as_vector()),length(inputDatasetsSamples %>% select(sample) %>% as_vector()),sep=" / "), style = "font-size: 130%;")
+      tags$p(paste(length(inputDatasets %>% select(dataset) %>% unique() %>% as_vector()),length(inputDatasets %>% select(sample) %>% as_vector()),sep=" / "), style = "font-size: 130%;")
     } else {
-      tags$p(paste(length(inputDatasetsSamples %>% select(dataset) %>% unique() %>% filter(dataset %in% input$updateInfo) %>% as_vector()),length(inputDatasetsSamples %>% filter(dataset %in% input$updateInfo) %>% select(sample)  %>% as_vector()),sep=" / "), style = "font-size: 130%;")
+      tags$p(paste(length(inputDatasets %>% select(dataset) %>% unique() %>% filter(dataset %in% input$updateInfo) %>% as_vector()),length(inputDatasets %>% filter(dataset %in% input$updateInfo) %>% select(sample)  %>% as_vector()),sep=" / "), style = "font-size: 130%;")
     }
   })
   
@@ -292,16 +282,36 @@ server <- function(input, output, session) {
   })
   
   
+  toListen <- reactive({
+    list(input$tab,input$dataset)
+  })
+  
+  observeEvent(toListen(),{
+    if(input$tab=="boxCell" & length(input$dataset) > 0){
+      data_to_plot <- reactiveCellCountData()
+      v$cellbox <- get_box_dataset_cellcount(data_to_plot)
+    }
+  })
+  
+  
+  
+  
+  
   ### Expression Data part:
   
-  cdata <- session$clientData
-  
-  v <- reactiveValues(dot = NULL, density = NULL, box = NULL)
+  v <- reactiveValues(dot = NULL, density = NULL, box = NULL, cellbox = NULL)
   
   reactiveData <- reactive({
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     get_data(input$sample,input$celltype,input$gene, con_himc)
   })
+  
+  reactiveCellCountData <- reactive({
+    if (length(input$dataset) > 0) {
+      get_cell_count_per_dataset(inputCellTypes,input$dataset)
+    }
+  })
+  
   
   observeEvent(input$dotPerCell,{ 
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
@@ -375,7 +385,7 @@ server <- function(input, output, session) {
   
   outSample <- reactive({
     if (length(input$dataset > 0)) {
-      inputDatasetsSamples %>% filter(dataset %in% !!input$dataset) %>% select(sample) %>% collect() %>% arrange(sample)
+      inputDatasets %>% filter(dataset %in% !!input$dataset) %>% select(sample) %>% collect() %>% arrange(sample)
     }
   })
   
@@ -421,6 +431,20 @@ server <- function(input, output, session) {
     if (is.null(v$box)) return()
     ggplotly(v$box, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
+
+  output$countBox <- renderPlotly({
+    if (is.null(v$cellbox)) return()
+    ggplotly(v$cellbox, width = cdata$output_pid_width, height = cdata$output_pid_height)
+  })
+  
+  output$countBar <- renderPlotly({
+    if (is.null(v$cellbar)) return()
+    ggplotly(v$cellbar, width = cdata$output_pid_width, height = cdata$output_pid_height)
+  })
+  
 }
+
+
+
 
 shinyApp(ui, server)

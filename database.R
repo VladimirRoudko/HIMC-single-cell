@@ -82,5 +82,17 @@ get_data <- function(samples,celltypes,genes, my_con_sql) {
 }
 
 
+get_cell_count_per_dataset <- function(inputCellTypes,selected_datasets){
+  cellcounts <- inputCellTypes %>% 
+    filter(dataset %in% selected_datasets) %>% 
+    count(dataset,sample,celltype)
+  
+  return(cellcounts)
+}
+
+
+
+
+
 
 

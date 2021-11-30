@@ -97,3 +97,18 @@ get_box_per_gene <- function(data_to_plot){
 }
 
 
+
+get_box_dataset_cellcount <- function(data_to_plot){
+  plot <- ggplot(data_to_plot, aes(x=celltype,y=n, fill=factor(dataset))) +  
+    geom_boxplot() + 
+    coord_flip() +
+    labs(fill = "dataset") + 
+    ylab("cell count") +
+    geom_point(position=position_jitterdodge(),alpha=0.3) +
+    facet_grid(~dataset) + theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5),
+                                   panel.border = element_rect(color = "black", fill = NA, size = 1), 
+                                   strip.background = element_rect(color = "black", size = 1.2),
+                                   strip.text.x=element_text(margin = margin(0.2,0.2,0.2,0.2, "cm")))
+  return(plot)
+}
+
