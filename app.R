@@ -132,9 +132,9 @@ ui <- dashboardPage(
 #                        actionButton(inputId = "box",label = "Group by cell type")),
 #                    div(style="display:inline-block;width:30%;text-align: center;",
 #                        actionButton(inputId = "boxPerGene",label = "Group by gene name")),
-                    br(),br(),
+                    br(),
                     plotlyOutput('countBox', height ="85vh"),
-                    br(),br(),
+                    br(),
                     DTOutput('countTable',height = "40vh") #,height = "85vh"
                 )
               )
@@ -290,6 +290,9 @@ server <- function(input, output, session) {
     if(input$tab=="boxCell" & length(input$dataset) > 0){
       data_to_plot <- reactiveCellCountData()
       v$cellbox <- get_box_dataset_cellcount(data_to_plot)
+      data_to_table <- data_to_plot %>% spread(celltype, n)
+      output$countTable <- get_count_table(data_to_table)
+      
     }
   })
   

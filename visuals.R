@@ -1,7 +1,7 @@
 #!/usr/bin/Rscript
 
 
-#### visuals for metadata as interactive table:
+#### visuals for interactive tables:
 
 get_table <- function(input_table) {
   table <- renderDT(input_table, 
@@ -20,6 +20,28 @@ get_table <- function(input_table) {
   
   return(table)
 }
+
+get_count_table <- function(input_table) {
+  table <- renderDT(input_table, 
+                    options = list(paging = TRUE,    ## paginate the output
+                                   pageLength = 5,  ## number of rows to output for each page
+                                   scrollX = TRUE,   ## enable scrolling on X axis
+                                   scrollY = TRUE,   ## enable scrolling on Y axis
+                                   searching = FALSE,
+                                   autoWidth = TRUE, ## use smart column width handling
+                                   server = FALSE,   ## use client-side processing
+                                   dom = 'Bfrtip',
+                                   columnDefs = list(list(targets = '_all', className = 'dt-center'))
+                    ),
+                    selection = 'single', ## enable selection of a single row
+                    filter = 'bottom',              ## include column filters at the bottom
+                    rownames = FALSE )
+  
+  return(table)
+}
+
+
+
 
 #### visuals of expression as dot plot:
 
