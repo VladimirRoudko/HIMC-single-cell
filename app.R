@@ -29,12 +29,12 @@ con_himc <- dbPool(
 
 #### add column with sample of origin
 database <- dbListTables(con_himc)
-inputGeneNames <- get_input_gene_list(con_himc)
-inputCellTypes <- get_input_cell_list(con_himc)
-inputDatasetsSamples <- get_input_dataset_sample_list(con_himc)
-inputListDatasets <- inputDatasetsSamples %>% collect() %>% select(dataset) %>% unique()
-inputMetaData <- get_input_metadata(con_himc)
-inputMetaData <- as_tibble(inputMetaData) %>% spread(term, value)
+inputGeneNames <- get_input_gene_list(con_himc) %>% collect()
+inputCellTypes <- get_input_cell_list(con_himc) %>% collect()
+inputDatasetsSamples <- get_input_dataset_sample_list(con_himc) %>% collect()
+inputMetaData <- get_input_metadata(con_himc) %>% as_tibble() %>% spread(term, value)
+
+length(inputGeneNames %>% select(gene) %>% unique() %>% as_vector())
 
 
 ui <- dashboardPage(
@@ -43,13 +43,12 @@ ui <- dashboardPage(
     sidebarMenu(
       # Setting id makes input$tabs give the tabName of currently-selected tab
       id = "tab",
-      menuItem("Dashboard", icon = icon("dashboard"), tabName = "dashboard"),
-      menuItem("Sample Metadata", icon = icon("clipboard-check"), tabName = "metadata"),
+      menuItem("Metadata Dashboard", icon = icon("dashboard"), tabName = "dashboard"),
       menuItem("Gene Expression", icon = icon("bar-chart-o"),
                menuSubItem("Dot Plot", tabName = "exprDot"),
                menuSubItem("Density Plot", tabName = "exprDensity"),
                menuSubItem("Box Plot", tabName = "exprBox"),
-               menuSubItem("Pairwase Scatter Plot", tabName = "pairwase")
+               menuSubItem("Heatmap", tabName = "pairwase")
       ),
       menuItem("Cell Fraction", icon = icon("calculator"),
                menuSubItem("Box Plot", tabName = "boxFraction"),
@@ -66,30 +65,40 @@ ui <- dashboardPage(
       menuItem("Survival analysis", icon = icon("project-diagram"), tabName="plotSurvival")
     ),
     br(),
-    selectizeInput(
-      'dataset', label='1. Select dataset:', choices = inputListDatasets$dataset, multiple = TRUE
-    ),
-    selectizeInput(
-      'sample', label='2. Select sample:', choices = NULL, multiple = TRUE
-    ),
-    selectizeInput(
-      'celltype', label='3. Select cell type:', choices = NULL, multiple = TRUE
-    ),
-    selectizeInput(
-      'gene', label='4. Select gene:', choices = NULL, multiple = TRUE
-    )
+    conditionalPanel(condition = "input.tab != 'dashboard'",
+                     selectizeInput(
+                       'dataset', label='1. Select dataset:', choices = inputDatasetsSamples$dataset, multiple = TRUE
+                     ),
+                     selectizeInput(
+                       'sample', label='2. Select sample:', choices = NULL, multiple = TRUE
+                     ),
+                     selectizeInput(
+                       'celltype', label='3. Select cell type:', choices = NULL, multiple = TRUE
+                     ),
+                     selectizeInput(
+                       'gene', label='4. Select gene:', choices = NULL, multiple = TRUE
+                     ))
   ),
   
   dashboardBody(
     tabItems(
-      tabItem("dashboard", "Dashboard tab content"),
-      tabItem("metadata", 
+      tabItem("dashboard",
+              fluidRow(
+                infoBoxOutput("datasetInfo",width=3),
+                infoBoxOutput("cellInfo",width=3),
+                infoBoxOutput("celltypeInfo",width=3),
+                infoBoxOutput("geneInfo",width=3)
+              ),
+              fluidRow(
+                column(12,align="center",
+                       selectInput('updateInfo', label='Update Dataset Info', choices = inputDatasetsSamples$dataset, multiple = TRUE)
+                )
+              ),
               fluidRow(
                 box(title = "Sample Metadata", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
                     br(),
-                    br(),
-                    DTOutput('metaTable',height = "90vh") #,height = "85vh"
+                    DTOutput('metaTable',height = "50vh") #,height = "85vh"
                 )
               )
       ),
@@ -201,9 +210,89 @@ ui <- dashboardPage(
 
 
 server <- function(input, output, session) {
-  output$res <- renderText({
-    paste("You've selected:", input$tabs)
+  
+  #### info Dashboard part
+  
+  updateDatasetInfo <- reactive({
+    if (length(input$updateInfo) == 0) {
+      tags$p(paste(length(inputDatasetsSamples %>% select(dataset) %>% unique() %>% as_vector()),length(inputDatasetsSamples %>% select(sample) %>% as_vector()),sep=" / "), style = "font-size: 130%;")
+    } else {
+      tags$p(paste(length(inputDatasetsSamples %>% select(dataset) %>% unique() %>% filter(dataset %in% input$updateInfo) %>% as_vector()),length(inputDatasetsSamples %>% filter(dataset %in% input$updateInfo) %>% select(sample)  %>% as_vector()),sep=" / "), style = "font-size: 130%;")
+    }
   })
+  
+  updateCellInfo <- reactive({
+    if (length(input$updateInfo) == 0) {
+      tags$p(length(inputCellTypes %>%  select(barcodeID) %>% as_vector()), style = "font-size: 130%;")
+    } else {
+      tags$p(length(inputCellTypes %>% filter(dataset %in% input$updateInfo) %>% select(barcodeID) %>% as_vector()), style = "font-size: 130%;")
+    }
+  })
+  
+  updateCelltypeInfo <- reactive({
+    if (length(input$updateInfo) == 0) {
+      tags$p(length(inputCellTypes %>%  select(celltype) %>% unique() %>% as_vector()), style = "font-size: 130%;")
+    } else {
+      tags$p(length(inputCellTypes %>% filter(dataset %in% input$updateInfo) %>% select(celltype) %>% unique() %>% as_vector()), style = "font-size: 130%;")
+    }
+  })
+  
+  updateGeneInfo <- reactive({
+    if (length(input$updateInfo) == 0) {
+      tags$p(length(inputGeneNames %>% select(gene) %>% unique() %>% as_vector()), style = "font-size: 130%;")
+    } else {
+      tags$p(length(inputGeneNames %>% filter(dataset %in% input$updateInfo) %>% select(gene) %>% unique() %>% as_vector()), style = "font-size: 130%;")
+    }
+  })
+  
+  output$datasetInfo <- renderInfoBox({
+    infoBox(title = tags$p("Dataset / Sample",style = "font-size: 130%;"),
+            value = updateDatasetInfo(), 
+            icon = icon("vials"), 
+            width=3, 
+            fill=TRUE,
+            color="red"
+    )
+  })
+  
+  output$cellInfo <- renderInfoBox({
+    infoBox(title = tags$p("Cell",style = "font-size: 130%;"),
+            value = updateCellInfo(), 
+            icon = icon("calculator"), 
+            width=3, 
+            fill=TRUE,
+            color="yellow"
+    )
+  })
+  
+  output$celltypeInfo <- renderInfoBox({
+    infoBox(title = tags$p("Celltype",style = "font-size: 130%;"),
+            value = updateCelltypeInfo(), 
+            icon = icon("project-diagram"), 
+            width=3, 
+            fill=TRUE,
+            color="green"
+    )
+  })
+  
+  output$geneInfo <- renderInfoBox({
+    infoBox(title = tags$p("Gene",style = "font-size: 130%;"),
+            value = updateGeneInfo(), 
+            icon = icon("dna"), 
+            width=3, 
+            fill=TRUE,
+            color="blue"
+    )
+  })
+  
+  observeEvent(input$tab, {
+    if (input$tab == "dashboard"){
+      output$metaTable <- get_table(inputMetaData)
+    }
+  })
+  
+  
+  ### Expression Data part:
   
   cdata <- session$clientData
   
@@ -213,13 +302,6 @@ server <- function(input, output, session) {
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     get_data(input$sample,input$celltype,input$gene, con_himc)
   })
-  
-  observeEvent(input$tab, {
-    if (input$tab == "metadata"){
-      output$metaTable <- get_table(inputMetaData)
-    }
-  })
-  
   
   observeEvent(input$dotPerCell,{ 
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
