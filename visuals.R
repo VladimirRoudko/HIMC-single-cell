@@ -134,3 +134,20 @@ get_box_dataset_cellcount <- function(data_to_plot){
   return(plot)
 }
 
+
+get_bar_gene_cellcount <- function(data_to_plot){
+  plot <- ggplot(data_to_plot, aes(fill=gene, y=count, x=celltype)) + 
+    geom_bar(position="stack", stat="identity") +
+    facet_wrap(~dataset+sample) +
+    coord_flip() + 
+    theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
+          panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+          strip.background = element_rect(color = "black", size = 0.5),
+          strip.text.x=element_text(margin = margin(0.2,0.2,0.2,0.2, "cm"))
+    )
+  return(plot)
+}
+
+
+
+

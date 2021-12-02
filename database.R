@@ -40,7 +40,7 @@ get_input_metadata <- function(my_con_sql){
   return(listMeta)
 }
 
-get_data <- function(samples,celltypes,genes, my_con_sql) {
+get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
   
   tableList <- dbListTables(my_con_sql)
   myMetaTable <- tableList[startsWith(tableList, "meta")]
@@ -57,28 +57,56 @@ get_data <- function(samples,celltypes,genes, my_con_sql) {
   selected_samples <- con_himc %>% 
     tbl(mySampleTable) %>% 
     filter(sample %in% samples)
-  
+
   selected_barcodids_celltypes <- con_himc %>% 
     tbl(myCellTable) %>% 
     filter(celltype %in% celltypes) %>% 
     filter(sampleID %in% selected_sampleid) 
+
   
   selected_geneid_genes <- con_himc %>% 
     tbl(myGeneTable) %>% 
     filter(gene %in% genes) %>% 
     filter(sampleID %in% selected_sampleid)
-
+  
   selected <- con_himc %>% tbl(myExpressionTable) %>%
     filter(sampleID %in% selected_sampleid) %>%
-    right_join(selected_geneid_genes) %>%
-    right_join(selected_barcodids_celltypes) %>% 
     left_join(selected_samples) %>%
-    select(-c(barcodeID,geneID)) %>% 
-    collect() %>%
-    group_by(celltype,gene) %>% 
-    slice_sample(n=200)
+    right_join(selected_barcodids_celltypes) %>% 
+    right_join(selected_geneid_genes) %>%
+    select(-geneID) %>% 
+    collect()
   
-  return(selected)
+  expression_sample <- selected %>% group_by(dataset,sample,celltype,gene) %>% slice_sample(n=200) %>% ungroup()
+  
+  positive_counts <- selected %>% filter(ncounts > 0) %>% 
+    group_by(sampleID,celltype,barcodeID) %>% 
+    count(gene) %>% 
+    pivot_wider(names_from = gene, values_from = n) %>% 
+    group_by(across(-barcodeID)) %>% 
+    summarise(N=n()) %>% ungroup() %>% rownames_to_column("ID") %>%
+    pivot_longer(!c(ID,sampleID,celltype,N),names_to = "variable",values_to="value") %>% drop_na() %>% 
+    mutate(value = variable[as.logical(value)]) %>% 
+    spread(variable, value) %>% replace(is.na(.), "zorg") %>%
+    pivot_wider(names_from = !c(ID,sampleID,celltype,N),values_from = N) %>%
+    rename_with(~str_remove_all(., "_zorg")) %>% rename_with(~str_remove_all(., 'zorg_')) %>%
+    pivot_longer(!c(ID,sampleID,celltype),names_to = "variable",values_to="count") %>% drop_na() %>% select(-ID)
+  
+  selected <- NULL
+  
+  positive_counts_total <- positive_counts %>% group_by(sampleID,celltype) %>% summarise(N=sum(count)) %>% ungroup()
+  
+  counts_total <- inputCellTypes %>% filter(sample %in% samples) %>% filter(celltype %in% celltypes) %>%
+    filter(dataset %in% datasets) %>% group_by(sampleID) %>% count(celltype) %>% ungroup() 
+  
+  complete_counts <- left_join(positive_counts_total,counts_total) %>% mutate(negative = n - N) %>% select(-c(N,n)) %>% 
+    pivot_longer(!c(sampleID,celltype),names_to = "variable",values_to="count") %>%
+    rbind(positive_counts) %>% arrange(sampleID,celltype) %>% rename(gene=variable) %>% left_join(as.data.frame(selected_samples)) %>% 
+    select(-sampleID)
+  
+  my_list <- list("expression" = expression_sample,"countPerGene" = complete_counts)
+  
+  return(my_list)
 }
 
 
