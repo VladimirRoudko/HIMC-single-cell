@@ -53,7 +53,7 @@ get_dot_per_cell <- function(data_to_plot){
     facet_grid(celltype~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                                    panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                                    strip.background = element_rect(color = "black", size = 1.2),
-                                                   strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                                   strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   return(plot)
 }
 
@@ -65,7 +65,7 @@ get_dot_per_gene <- function(data_to_plot){
     facet_grid(gene ~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                               panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                               strip.background = element_rect(color = "black", size = 1.2),
-                                              strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                              strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   return(plot)
 }
 
@@ -77,7 +77,7 @@ get_density_per_cell <- function(data_to_plot){
     facet_grid(gene ~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                                 panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                                 strip.background = element_rect(color = "black", size = 1.2),
-                                                strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                                strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   
   return(plot) 
 }
@@ -89,7 +89,7 @@ get_density_per_gene <- function(data_to_plot){
     facet_grid(celltype ~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                                     panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                                     strip.background = element_rect(color = "black", size = 1.2),
-                                                    strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                                    strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   
   return(plot)
 }
@@ -102,7 +102,7 @@ get_box_per_cell <- function(data_to_plot){
     facet_grid(celltype ~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                                     panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                                     strip.background = element_rect(color = "black", size = 1.2),
-                                                    strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                                    strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   return(plot)
   }
 
@@ -114,7 +114,7 @@ get_box_per_gene <- function(data_to_plot){
     facet_grid(gene ~ dataset + sample) + theme(panel.spacing = unit(.05, "lines"),
                                                 panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                                 strip.background = element_rect(color = "black", size = 1.2),
-                                                strip.text.x=element_text(margin = margin(0.5,0.2,0.5,0.2, "cm")))
+                                                strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
   return(plot)
 }
 
@@ -143,7 +143,7 @@ get_bar_gene_cellcount <- function(data_to_plot){
     theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
           panel.border = element_rect(color = "black", fill = NA, size = 0.5),
           strip.background = element_rect(color = "black", size = 0.5),
-          strip.text.x=element_text(margin = margin(0.2,0.2,0.2,0.2, "cm"))
+          strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm"))
     )
   return(plot)
 }

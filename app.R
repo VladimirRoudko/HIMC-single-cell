@@ -51,7 +51,16 @@ ui <- dashboardPage(
                      ),
                      selectizeInput(
                        'gene', label='4. Select gene:', choices = NULL, multiple = TRUE
-                     ))
+                     )),
+    conditionalPanel(condition = "input.tab !='dashboard' && input.tab != 'boxCell' && input.tab != 'barCell'",
+                     fluidRow( column(5, offset = 0, actionButton(inputId = "exprPerCell", label = "By celltype")),
+                               column(5, offset = 0, actionButton(inputId = "exprPerGene", label = "By gene"))
+                               )
+                     ),
+    conditionalPanel(condition = "input.tab == 'barCell'",
+                     fluidRow( column(6, offset = 2, actionButton(inputId = "countPerGene", label = "By gene"))
+                       )
+    )
   ),
   
   dashboardBody(
@@ -80,11 +89,7 @@ ui <- dashboardPage(
               fluidRow(
                 box(title = "Expression Dot Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    div(style="display:inline-block;width:20%;text-align: center;",
-                        actionButton(inputId = "dotPerCell",label = "Group by cell type")),
-                    div(style="display:inline-block;width:30%;text-align: center;",
-                        actionButton(inputId = "dotPerGene",label = "Group by gene name")),
-                    br(),br(),
+                    br(),
                     plotlyOutput('exprDot', height ="90vh")
                 )
               )
@@ -93,11 +98,7 @@ ui <- dashboardPage(
               fluidRow(
                 box(title = "Expression Density Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    div(style="display:inline-block;width:20%;text-align: center;",
-                        actionButton(inputId = "densityPerCell",label = "Group by cell type")),
-                    div(style="display:inline-block;width:30%;text-align: center;",
-                        actionButton(inputId = "densityPerGene",label = "Group by gene name")),
-                    br(),br(),
+                    br(),
                     plotlyOutput('exprDensity', height ="90vh")
                 )
               )
@@ -106,11 +107,7 @@ ui <- dashboardPage(
               fluidRow(
                 box(title = "Expression Box Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    div(style="display:inline-block;width:20%;text-align: center;",
-                        actionButton(inputId = "boxPerCell",label = "Group by cell type")),
-                    div(style="display:inline-block;width:30%;text-align: center;",
-                        actionButton(inputId = "boxPerGene",label = "Group by gene name")),
-                    br(),br(),
+                    br(),
                     plotlyOutput('exprBox', height ="90vh")
                 )
               )
@@ -139,14 +136,10 @@ ui <- dashboardPage(
               fluidRow(
                 box(title = "Cell Fraction Bar Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    div(style="display:inline-block;width:70%;text-align: center;",
-                        actionButton(inputId = "barPerGene",label = "Group by cell type")),
-                    br(),
                     br(),
                     plotlyOutput('countPerGeneBar', height ="85vh"),
                     br(),
                     DTOutput('countPerGeneTable',height = "40vh")
-                    
                 )
               )
       ),
@@ -278,7 +271,6 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$tab,{
-    
     if (input$tab == "dashboard"){
       output$metaTable <- get_table(inputMetaData)
     }
@@ -297,8 +289,59 @@ server <- function(input, output, session) {
       data_to_table <- data_to_plot %>% spread(celltype, n)
       output$countTable <- get_count_table(data_to_table)
     }
-  
     })
+  
+  observeEvent(input$exprPerCell,{
+    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
+    
+    data_to_plot <- reactiveData()$expression
+    
+    if (input$tab == "exprDot"){
+      v$dot <- get_dot_per_cell(data_to_plot)
+    }
+    
+    if(input$tab == "exprDensity"){
+      v$density <- get_density_per_cell(data_to_plot)
+    }
+    
+    if(input$tab == "exprBox"){
+      v$box <- get_box_per_cell(data_to_plot)
+    }
+  })
+  
+  observeEvent(input$exprPerGene,{
+    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
+    
+    data_to_plot <- reactiveData()$expression
+    
+    if (input$tab == "exprDot"){
+      v$dot <- get_dot_per_gene(data_to_plot)
+    }
+    
+    if(input$tab == "exprDensity"){
+      v$density <- get_density_per_gene(data_to_plot)
+    }
+    
+    if(input$tab == "exprBox"){
+      v$box <- get_box_per_gene(data_to_plot)
+    }
+  })
+  
+  observeEvent(input$countPerGene,{
+    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
+    
+    if(input$tab=="barCell") {
+      data_to_plot <- reactiveData()$countPerGene
+      
+      v$cellbar <- get_bar_gene_cellcount(data_to_plot)
+      
+      data_to_table <- data_to_plot %>% spread(celltype,count)
+      
+      output$countPerGeneTable <- get_count_table(data_to_table)
+    }
+  })
+  
+  
   
   observeEvent(input$barPerGene,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
@@ -316,11 +359,6 @@ server <- function(input, output, session) {
   })
   
   
-  
-  
-  
-  ### Expression Data part:
-  
   v <- reactiveValues(dot = NULL, density = NULL, box = NULL, cellbox = NULL, cellbar = NULL)
   
   reactiveData <- reactive({
@@ -331,75 +369,6 @@ server <- function(input, output, session) {
   reactiveCellCountData <- reactive({
     if (length(input$dataset) > 0) {
       get_cell_count_per_dataset(inputCellTypes,input$dataset)
-    }
-  })
-  
-  
-  observeEvent(input$dotPerCell,{ 
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprDot"){
-      v$dot <- get_dot_per_cell(data_to_plot)
-    }
-  })
-  
-  observeEvent(input$dotPerGene,{ 
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprDot"){
-      v$dot <- get_dot_per_gene(data_to_plot)
-    }
-  })
-  
-  observeEvent(input$densityPerCell,{ 
-    ### add option to set Y-limit for the density plot
-    
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprDensity"){
-      v$density <- get_density_per_cell(data_to_plot)
-    }
-  })
-  
-  observeEvent(input$densityPerGene,{ 
-    ### add option to set Y-limit for the density plot
-    
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprDensity"){
-      v$density <- get_density_per_gene(data_to_plot)
-    }
-  })
-  
-  observeEvent(input$boxPerCell,{ 
-    ### add option to set Y-limit for the box plot
-    
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprBox"){
-      v$box <- get_box_per_cell(data_to_plot)
-    }
-  })
-  
-  observeEvent(input$boxPerGene,{ 
-    ### add option to set Y-limit for the box plot
-    
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    data_to_plot <- reactiveData()$expression
-    
-    if (input$tab == "exprBox"){
-      v$box <- get_box_per_gene(data_to_plot)
     }
   })
   
@@ -459,19 +428,11 @@ server <- function(input, output, session) {
     ggplotly(v$cellbox, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
   
-  output$countBar <- renderPlotly({
-    if (is.null(v$cellbar)) return()
-    ggplotly(v$cellbar, width = cdata$output_pid_width, height = cdata$output_pid_height)
-  })
-  
   output$countPerGeneBar <- renderPlotly({
     if (is.null(v$cellbar)) return()
     ggplotly(v$cellbar, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
   
 }
-
-
-
 
 shinyApp(ui, server)

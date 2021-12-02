@@ -75,7 +75,7 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
     right_join(selected_barcodids_celltypes) %>% 
     right_join(selected_geneid_genes) %>%
     select(-geneID) %>% 
-    collect()
+    collect() %>% drop_na()
   
   expression_sample <- selected %>% group_by(dataset,sample,celltype,gene) %>% slice_sample(n=200) %>% ungroup()
   
