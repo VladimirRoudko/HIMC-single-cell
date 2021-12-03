@@ -21,7 +21,7 @@ ui <- dashboardPage(
                menuSubItem("Dot", tabName = "exprDot"),
                menuSubItem("Density", tabName = "exprDensity"),
                menuSubItem("Box", tabName = "exprBox"),
-               menuSubItem("Heatmap averages", tabName = "heatmap")
+               menuSubItem("Heatmap", tabName = "exprHeatmap")
       ),
       menuItem("Cell Counts", icon = icon("calculator"),
                menuSubItem("Dataset overview", tabName = "boxCell"),
@@ -52,11 +52,15 @@ ui <- dashboardPage(
                      selectizeInput(
                        'gene', label='4. Select gene:', choices = NULL, multiple = TRUE
                      )),
-    conditionalPanel(condition = "input.tab !='dashboard' && input.tab != 'boxCell' && input.tab != 'barCell'",
+    conditionalPanel(condition = "input.tab =='exprDot' || input.tab == 'exprBox' || input.tab == 'exprDensity'",
                      fluidRow( column(5, offset = 0, actionButton(inputId = "exprPerCell", label = "By celltype")),
                                column(5, offset = 0, actionButton(inputId = "exprPerGene", label = "By gene"))
                                )
                      ),
+    conditionalPanel(condition = "input.tab == 'exprHeatmap'",
+                     fluidRow( column(6, offset = 2, actionButton(inputId = "exprPerHeatmap", label = "Draw heatmap"))
+                     )
+    ),
     conditionalPanel(condition = "input.tab == 'barCell'",
                      fluidRow( column(6, offset = 2, actionButton(inputId = "countPerGene", label = "By gene"))
                        )
@@ -112,12 +116,12 @@ ui <- dashboardPage(
                 )
               )
       ),
-      tabItem("heatmap", 
+      tabItem("exprHeatmap", 
               fluidRow(
                 box(title = "Heatmap Plot", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
-                    # plotlyOutput('dot', height ="90vh")
-                    "Here will be plot"
+                    br(),
+                    plotlyOutput('exprHeat', height ="90vh")
                 )
               )
       ),
@@ -309,6 +313,17 @@ server <- function(input, output, session) {
     }
   })
   
+  observeEvent(input$exprPerHeatmap,{
+    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
+    
+    data_to_plot <- reactiveData()$exprAverage
+    
+    if (input$tab == "exprHeatmap"){
+      v$heatmap <- get_heatmap_expression(data_to_plot)
+    }
+  })
+  
+  
   observeEvent(input$exprPerGene,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
@@ -341,8 +356,6 @@ server <- function(input, output, session) {
     }
   })
   
-  
-  
   observeEvent(input$barPerGene,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
@@ -354,12 +367,11 @@ server <- function(input, output, session) {
       data_to_table <- data_to_plot %>% spread(celltype,count)
       
       output$countPerGeneTable <- get_count_table(data_to_table)
-      
     }
   })
   
   
-  v <- reactiveValues(dot = NULL, density = NULL, box = NULL, cellbox = NULL, cellbar = NULL)
+  v <- reactiveValues(dot = NULL, density = NULL, box = NULL, heatmap = NULL, cellbox = NULL, cellbar = NULL)
   
   reactiveData <- reactive({
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
@@ -422,6 +434,11 @@ server <- function(input, output, session) {
     if (is.null(v$box)) return()
     ggplotly(v$box, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
+  
+  output$exprHeat <- renderPlotly({
+    if (is.null(v$heatmap)) return()
+    ggplotly(v$heatmap, width = cdata$output_pid_width, height = cdata$output_pid_height)
+  })
 
   output$countBox <- renderPlotly({
     if (is.null(v$cellbox)) return()
@@ -432,6 +449,9 @@ server <- function(input, output, session) {
     if (is.null(v$cellbar)) return()
     ggplotly(v$cellbar, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
+  
+  
+  
   
 }
 

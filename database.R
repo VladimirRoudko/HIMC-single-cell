@@ -104,7 +104,15 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
     rbind(positive_counts) %>% arrange(sampleID,celltype) %>% rename(gene=variable) %>% left_join(as.data.frame(selected_samples)) %>% 
     select(-sampleID)
   
-  my_list <- list("expression" = expression_sample,"countPerGene" = complete_counts)
+  expression_averages <- expression_sample %>% 
+    group_by(sampleID,celltype,gene) %>% 
+    summarize(mean = mean(ncounts, na.rm=TRUE)) %>% 
+    ungroup() %>% 
+    complete(sampleID,celltype,gene) %>% 
+    left_join(as.data.frame(selected_samples)) %>% 
+    replace(is.na(.), 0)
+  
+  my_list <- list("expression" = expression_sample,"countPerGene" = complete_counts,"exprAverage" = expression_averages)
   
   return(my_list)
 }

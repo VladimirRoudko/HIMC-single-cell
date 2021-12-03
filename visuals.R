@@ -127,10 +127,11 @@ get_box_dataset_cellcount <- function(data_to_plot){
     labs(fill = "dataset") + 
     ylab("cell count") +
     geom_point(position=position_jitterdodge(),alpha=0.3) +
-    facet_grid(~dataset) + theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5),
+    facet_wrap(~dataset) + theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5),
                                    panel.border = element_rect(color = "black", fill = NA, size = 1), 
                                    strip.background = element_rect(color = "black", size = 1.2),
                                    strip.text.x=element_text(margin = margin(0.2,0.2,0.2,0.2, "cm")))
+  
   return(plot)
 }
 
@@ -138,15 +139,36 @@ get_box_dataset_cellcount <- function(data_to_plot){
 get_bar_gene_cellcount <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(fill=gene, y=count, x=celltype)) + 
     geom_bar(position="stack", stat="identity") +
-    facet_wrap(~dataset+sample) +
+    facet_grid(~dataset+sample) +
     coord_flip() + 
     theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 0.5), 
           panel.border = element_rect(color = "black", fill = NA, size = 0.5),
           strip.background = element_rect(color = "black", size = 0.5),
-          strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm"))
-    )
+          strip.text.x=element_text(margin = margin(0.4,0.2,0.4,0.2, "cm")))
+  
   return(plot)
 }
+
+get_heatmap_expression <- function(data_to_plot){
+  plot <- ggplot(data_to_plot, aes(gene, celltype)) + 
+    geom_tile(aes(fill= mean), colour = "black", size=1) +
+    scale_fill_viridis_c(option = "D", direction = 1) +
+#    scale_fill_gradient(low="white", high="blue",na.value = 'white') +
+    facet_wrap(~dataset+sample) +
+    theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5), 
+          panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+          strip.background = element_rect(color = "black", size = 0.5),
+          strip.text.x=element_text(margin = margin(0.35,0.2,0.35,0.2, "cm"))) 
+  
+  return(plot)
+}
+
+
+
+
+
+
+
 
 
 
