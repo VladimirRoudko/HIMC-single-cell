@@ -9,8 +9,8 @@ library(keyring)
 con_himc <- dbPool(
   odbc::odbc(),
   drv = RMariaDB::MariaDB(), 
-  username = "roudkv01",
-  password = key_get("sql", "roudkv01"), 
+  username = key_get("sql", "key2"),
+  password = key_get("sql", "key1"), 
   host = "data1.hpc.mssm.edu", 
   port = 3306,
   dbname = "himc_data1"
