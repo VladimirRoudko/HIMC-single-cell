@@ -101,7 +101,7 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
   positive_counts_total <- positive_counts %>% group_by(sampleID,celltype) %>% summarise(N=sum(count)) %>% ungroup()
   
   counts_total <- inputCellTypes %>% filter(sample %in% samples) %>% filter(celltype %in% celltypes) %>%
-    filter(dataset %in% datasets) %>% group_by(sampleID) %>% count(celltype) %>% ungroup() 
+   group_by(sampleID) %>% count(celltype) %>% ungroup() 
   
   counts_per_gene <- left_join(positive_counts_total,counts_total) %>% mutate(negative = n - N) %>% select(-c(N,n)) %>% 
     pivot_longer(!c(sampleID,celltype),names_to = "variable",values_to="count") %>%
