@@ -1,5 +1,9 @@
 #!/usr/bin/Rscript
 
+scale_this <- function(x){
+  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
+}
+
 get_input_gene_list <- function(my_con_sql){
   tableList <- dbListTables(my_con_sql)
   myGeneTable <- tableList[startsWith(tableList, "gene")]
@@ -99,10 +103,11 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
   counts_total <- inputCellTypes %>% filter(sample %in% samples) %>% filter(celltype %in% celltypes) %>%
     filter(dataset %in% datasets) %>% group_by(sampleID) %>% count(celltype) %>% ungroup() 
   
-  complete_counts <- left_join(positive_counts_total,counts_total) %>% mutate(negative = n - N) %>% select(-c(N,n)) %>% 
+  counts_per_gene <- left_join(positive_counts_total,counts_total) %>% mutate(negative = n - N) %>% select(-c(N,n)) %>% 
     pivot_longer(!c(sampleID,celltype),names_to = "variable",values_to="count") %>%
     rbind(positive_counts) %>% arrange(sampleID,celltype) %>% rename(gene=variable) %>% left_join(as.data.frame(selected_samples)) %>% 
-    select(-sampleID)
+    select(-sampleID) %>% relocate(gene, .after = sample) %>% replace(is.na(.), 0) %>% group_by(dataset,sample) %>% mutate(frequency = count / sum(count)) %>% ungroup() %>%
+    group_by(dataset,sample,celltype) %>% mutate(relative_frequency = count / sum(count)) %>% ungroup()
   
   expression_averages <- expression_sample %>% 
     group_by(sampleID,celltype,gene) %>% 
@@ -110,9 +115,11 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
     ungroup() %>% 
     complete(sampleID,celltype,gene) %>% 
     left_join(as.data.frame(selected_samples)) %>% 
-    replace(is.na(.), 0)
+    replace(is.na(.), 0) %>% group_by(dataset,sample) %>% 
+    mutate(mean_scaled = scale_this(mean)) %>% replace(is.na(.), -2) %>% 
+    mutate(mean_scaled = replace(mean_scaled, mean_scaled > 2, 2)) %>% ungroup()
   
-  my_list <- list("expression" = expression_sample,"countPerGene" = complete_counts,"exprAverage" = expression_averages)
+  my_list <- list("expression" = expression_sample,"countPerGene" = counts_per_gene,"exprMean" = expression_averages)
   
   return(my_list)
 }
@@ -121,7 +128,10 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
 get_cell_count_per_dataset <- function(inputCellTypes,selected_datasets){
   cellcounts <- inputCellTypes %>% 
     filter(dataset %in% selected_datasets) %>% 
-    count(dataset,sample,celltype)
+    count(dataset,sample,celltype) %>%
+    group_by(dataset,sample) %>% 
+    mutate(frequency = n / sum(n)) %>%
+    ungroup()
   
   return(cellcounts)
 }

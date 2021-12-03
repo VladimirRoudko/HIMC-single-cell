@@ -42,7 +42,8 @@ ui <- dashboardPage(
     conditionalPanel(condition = "input.tab != 'dashboard'",
                      selectizeInput(
                        'dataset', label='1. Select dataset:', choices = inputDatasets$dataset, multiple = TRUE
-                     ),
+                     )),
+    conditionalPanel(condition = "input.tab != 'dashboard' && input.tab != 'boxCell'",
                      selectizeInput(
                        'sample', label='2. Select sample:', choices = NULL, multiple = TRUE
                      ),
@@ -58,11 +59,13 @@ ui <- dashboardPage(
                                )
                      ),
     conditionalPanel(condition = "input.tab == 'exprHeatmap'",
-                     fluidRow( column(6, offset = 2, actionButton(inputId = "exprPerHeatmap", label = "Draw heatmap"))
+                     fluidRow(column(5, offset = 0, actionButton(inputId = "exprPerHeatmapUnscaled", label = "Unscaled")),
+                              column(5, offset = 0, actionButton(inputId = "exprPerHeatmapScaled", label = "Scaled"))
                      )
     ),
-    conditionalPanel(condition = "input.tab == 'barCell'",
-                     fluidRow( column(6, offset = 2, actionButton(inputId = "countPerGene", label = "By gene"))
+    conditionalPanel(condition = "input.tab == 'barCell' || input.tab == 'boxCell'",
+                     fluidRow( column(4, offset = 0, actionButton(inputId = "count", label = "By count")),
+                               column(6, offset = 0, actionButton(inputId = "frequency", label = "By frequency"))
                        )
     )
   ),
@@ -280,21 +283,6 @@ server <- function(input, output, session) {
     }
   })
   
-  toListen2 <- reactive({
-    list(input$tab,input$dataset)
-  })
-  
-  observeEvent(toListen2(),{
-    
-    if(input$tab=="boxCell" & length(input$dataset) > 0){
-      data_to_plot <- reactiveCellCountData()
-      v$cellbox <- get_box_dataset_cellcount(data_to_plot)
-      
-      data_to_table <- data_to_plot %>% spread(celltype, n)
-      output$countTable <- get_count_table(data_to_table)
-    }
-    })
-  
   observeEvent(input$exprPerCell,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
@@ -313,15 +301,26 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$exprPerHeatmap,{
+  observeEvent(input$exprPerHeatmapUnscaled,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
-    data_to_plot <- reactiveData()$exprAverage
+    data_to_plot <- reactiveData()$exprMean
     
     if (input$tab == "exprHeatmap"){
-      v$heatmap <- get_heatmap_expression(data_to_plot)
+      v$heatmap <- get_heatmap_expression_unscaled(data_to_plot)
     }
   })
+  
+  observeEvent(input$exprPerHeatmapScaled,{
+    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
+    
+    data_to_plot <- reactiveData()$exprMean
+    
+    if (input$tab == "exprHeatmap"){
+      v$heatmap <- get_heatmap_expression_scaled(data_to_plot)
+    }
+  })
+  
   
   
   observeEvent(input$exprPerGene,{
@@ -342,19 +341,49 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$countPerGene,{
-    if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
-    
-    if(input$tab=="barCell") {
+  observeEvent(input$count,{
+    if(input$tab=="barCell" & !is.null(input$sample) & !is.null(input$celltype) & !is.null(input$gene)) {
+
       data_to_plot <- reactiveData()$countPerGene
-      
       v$cellbar <- get_bar_gene_cellcount(data_to_plot)
       
-      data_to_table <- data_to_plot %>% spread(celltype,count)
-      
+      data_to_table <- data_to_plot %>% spread(celltype,count) %>% select(-c(frequency,relative_frequency))
       output$countPerGeneTable <- get_count_table(data_to_table)
     }
+    
+    if(input$tab == "boxCell" & length(input$dataset) > 0){
+      
+      data_to_plot <- reactiveCellCountData()
+      v$cellbox <- get_box_dataset_cellcount(data_to_plot)
+      
+      data_to_table <- data_to_plot %>% spread(celltype, n) %>% select(-frequency)
+      output$countTable <- get_count_table(data_to_table)
+    }
   })
+  
+  observeEvent(input$frequency,{
+    if(input$tab=="barCell" & !is.null(input$sample) & !is.null(input$celltype) & !is.null(input$gene)) {
+      
+      data_to_plot <- reactiveData()$countPerGene
+      v$cellbar <- get_bar_gene_frequency(data_to_plot)
+      
+      data_to_table <- data_to_plot %>% spread(celltype,frequency) %>% select(-c(count,relative_frequency))
+      output$countPerGeneTable <- get_count_table(data_to_table)
+    }
+    
+    if(input$tab == "boxCell" & length(input$dataset) > 0){
+      
+      data_to_plot <- reactiveCellCountData()
+      v$cellbox <- get_box_dataset_frequency(data_to_plot)
+      
+      data_to_table <- data_to_plot %>% spread(celltype, frequency) %>% select(-n)
+      output$countTable <- get_count_table(data_to_table)
+    }
+  })
+  
+  
+  
+  
   
   observeEvent(input$barPerGene,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
