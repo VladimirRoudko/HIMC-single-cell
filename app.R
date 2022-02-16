@@ -10,6 +10,9 @@ source("visuals.R")
 source("global.R")
 
 
+
+#################################################################################
+################################## DASHBOARD SETUP ########################
 ui <- dashboardPage(
   dashboardHeader(title='HIMC single cell'), 
   dashboardSidebar(
@@ -18,14 +21,15 @@ ui <- dashboardPage(
       id = "tab",
       menuItem("Metadata Dashboard", icon = icon("dashboard"), tabName = "dashboard"),
       menuItem("Gene Expression", icon = icon("bar-chart-o"),
-               menuSubItem("Dot", tabName = "exprDot"),
-               menuSubItem("Density", tabName = "exprDensity"),
-               menuSubItem("Box", tabName = "exprBox"),
-               menuSubItem("Heatmap", tabName = "exprHeatmap")
+               menuSubItem("Dot plot", tabName = "exprDot"),
+               menuSubItem("Density plot", tabName = "exprDensity"),
+               menuSubItem("Box plot", tabName = "exprBox"),
+               menuSubItem("Heatmap plot", tabName = "exprHeatmap")
       ),
-      menuItem("Cell Counts", icon = icon("calculator"),
-               menuSubItem("Dataset overview", tabName = "boxCell"),
-               menuSubItem("Selection subsets", tabName = "barCell"),
+      menuItem("Cell Frequences", icon = icon("calculator"),
+               menuSubItem("Dataset composition", tabName = "datasetComposition"),
+               menuSubItem("Sample composition", tabName = "sampleComposition"),
+               menuSubItem("Metadata integration", tabName = "barCell"),
                menuSubItem("Metadata subsets", tabName = "metaCell")
       ),
       menuItem("DE Genes", icon = icon("dna"),
@@ -39,37 +43,48 @@ ui <- dashboardPage(
       menuItem("Survival analysis", icon = icon("project-diagram"), tabName="plotSurvival")
     ),
     br(),
+    
+############################## SELECTION FIELDS AND BUTTONS ###################
+    
     conditionalPanel(condition = "input.tab != 'dashboard'",
                      selectizeInput(
                        'dataset', label='1. Select dataset:', choices = inputDatasets$dataset, multiple = TRUE
                      )),
-    conditionalPanel(condition = "input.tab != 'dashboard' && input.tab != 'boxCell'",
+    conditionalPanel(condition = "input.tab != 'dashboard' && input.tab != 'datasetComposition'",
                      selectizeInput(
                        'sample', label='2. Select sample:', choices = NULL, multiple = TRUE
                      ),
                      selectizeInput(
                        'celltype', label='3. Select cell type:', choices = NULL, multiple = TRUE
-                     ),
+                     )),
+    conditionalPanel(condition = "input.tab != 'dashboard' && input.tab != 'datasetComposition' && input.tab != 'sampleComposition'",
                      selectizeInput(
                        'gene', label='4. Select gene:', choices = NULL, multiple = TRUE
                      )),
     conditionalPanel(condition = "input.tab =='exprDot' || input.tab == 'exprBox' || input.tab == 'exprDensity'",
-                     fluidRow( column(5, offset = 0, actionButton(inputId = "exprPerCell", label = "By celltype")),
-                               column(5, offset = 0, actionButton(inputId = "exprPerGene", label = "By gene"))
+                     fluidRow( column(5, offset = 0, actionButton(inputId = "getExprPerCell", label = "By celltype")),
+                               column(5, offset = 0, actionButton(inputId = "getExprPerGene", label = "By gene"))
                                )
                      ),
     conditionalPanel(condition = "input.tab == 'exprHeatmap'",
-                     fluidRow(column(5, offset = 0, actionButton(inputId = "exprPerHeatmapUnscaled", label = "Unscaled")),
-                              column(5, offset = 0, actionButton(inputId = "exprPerHeatmapScaled", label = "Scaled"))
+                     fluidRow(column(5, offset = 0, actionButton(inputId = "getExprHeatUnscaled", label = "Unscaled")),
+                              column(5, offset = 0, actionButton(inputId = "getExprHeatScaled", label = "Scaled"))
                      )
     ),
-    conditionalPanel(condition = "input.tab == 'barCell' || input.tab == 'boxCell'",
-                     fluidRow( column(4, offset = 0, actionButton(inputId = "count", label = "By count")),
-                               column(6, offset = 0, actionButton(inputId = "frequency", label = "By frequency"))
+    conditionalPanel(condition = "input.tab == 'barCell' || input.tab == 'datasetComposition'",
+                     fluidRow( column(4, offset = 0, actionButton(inputId = "getDatasetCompCount", label = "By count")),
+                               column(6, offset = 0, actionButton(inputId = "getDatasetCompFreq", label = "By frequency"))
                        )
+    ),
+    conditionalPanel(condition = "input.tab == 'sampleComposition'",
+                     fluidRow( column(5, offset = 3, actionButton(inputId = "getSampleCompApply", label = "Apply"))
+                     )
     )
+    
   ),
   
+##############################################################################
+########################################## TAB SETUP ######################
   dashboardBody(
     tabItems(
       tabItem("dashboard",
@@ -92,6 +107,8 @@ ui <- dashboardPage(
                 )
               )
       ),
+
+############################################ EXPRESSION TABS ###########################
       tabItem("exprDot", 
               fluidRow(
                 box(title = "Expression Dot Plot", status = "primary", width = 12, #height ="90vh", 
@@ -128,9 +145,11 @@ ui <- dashboardPage(
                 )
               )
       ),
-      tabItem("boxCell", 
+
+##################################### CELL COUNT TABS ###################################
+      tabItem("datasetComposition", 
               fluidRow(
-                box(title = "Cell Fraction Box Plot", status = "primary", width = 12, #height ="90vh", 
+                box(title = "Dataset Composition", status = "primary", width = 12, #height ="90vh", 
                     solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
                     br(),
                     plotlyOutput('countBox', height ="85vh"),
@@ -139,6 +158,20 @@ ui <- dashboardPage(
                 )
               )
       ),
+      tabItem("sampleComposition", 
+              fluidRow(
+                box(title = "Sample Composition", status = "primary", width = 12, #height ="90vh", 
+                    solidHeader = TRUE, collapsible = FALSE,collapsed = FALSE,
+                    br(),
+                    plotlyOutput('sampleStats', height ="85vh"),
+                    br()
+                    
+                    #DTOutput('countTable',height = "40vh")
+                )
+              )
+      ),
+      
+      
       tabItem("barCell", 
               fluidRow(
                 box(title = "Cell Fraction Bar Plot", status = "primary", width = 12, #height ="90vh", 
@@ -150,6 +183,8 @@ ui <- dashboardPage(
                 )
               )
       ),
+      
+################### DIFFERENTIAL EXPRESSION TAB, OTHER STATISTICS? #######################
       tabItem("boxDE", 
               fluidRow(
                 box(title = "Differentially Expressed Genes Box Plot", status = "primary", width = 12, #height ="90vh", 
@@ -203,7 +238,8 @@ server <- function(input, output, session) {
   
   cdata <- session$clientData
   
-  #### info Dashboard part
+######################################################################################
+##############################3## DASHBOARD REACTIVITY TO SELECTION ################
   
   updateDatasetInfo <- reactive({
     if (length(input$updateInfo) == 0) {
@@ -283,7 +319,11 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$exprPerCell,{
+  
+###############################################################################
+############################ EXPRESSION REACTIVITY TO BUTTONS ################
+  
+  observeEvent(input$getExprPerCell,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
     data_to_plot <- reactiveData()$expression
@@ -301,7 +341,7 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$exprPerHeatmapUnscaled,{
+  observeEvent(input$getExprHeatUnscaled,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
     data_to_plot <- reactiveData()$exprMean
@@ -311,7 +351,7 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$exprPerHeatmapScaled,{
+  observeEvent(input$getExprHeatScaled,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
     data_to_plot <- reactiveData()$exprMean
@@ -321,9 +361,7 @@ server <- function(input, output, session) {
     }
   })
   
-  
-  
-  observeEvent(input$exprPerGene,{
+  observeEvent(input$getExprPerGene,{
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     
     data_to_plot <- reactiveData()$expression
@@ -341,7 +379,10 @@ server <- function(input, output, session) {
     }
   })
   
-  observeEvent(input$count,{
+#######################3###########################################################
+###################### CELL COUNT REACTIVITY TO BUTTONS ################
+  
+  observeEvent(input$getDatasetCompCount,{
     if(input$tab=="barCell" & !is.null(input$sample) & !is.null(input$celltype) & !is.null(input$gene)) {
 
       data_to_plot <- reactiveData()$countPerGene
@@ -351,17 +392,17 @@ server <- function(input, output, session) {
       output$countPerGeneTable <- get_count_table(data_to_table)
     }
     
-    if(input$tab == "boxCell" & length(input$dataset) > 0){
+    if(input$tab == "datasetComposition" & length(input$dataset) > 0){
       
       data_to_plot <- reactiveCellCountData()
-      v$cellbox <- get_box_dataset_cellcount(data_to_plot)
+      v$datasetstats <- get_box_dataset_cellcount(data_to_plot)
       
       data_to_table <- data_to_plot %>% spread(celltype, n) %>% select(-frequency)
       output$countTable <- get_count_table(data_to_table)
     }
   })
   
-  observeEvent(input$frequency,{
+  observeEvent(input$getDatasetCompFreq,{
     if(input$tab=="barCell" & !is.null(input$sample) & !is.null(input$celltype) & !is.null(input$gene)) {
       
       data_to_plot <- reactiveData()$countPerGene
@@ -371,17 +412,23 @@ server <- function(input, output, session) {
       output$countPerGeneTable <- get_count_table(data_to_table)
     }
     
-    if(input$tab == "boxCell" & length(input$dataset) > 0){
+    if(input$tab == "datasetComposition" & length(input$dataset) > 0){
       
       data_to_plot <- reactiveCellCountData()
-      v$cellbox <- get_box_dataset_frequency(data_to_plot)
+      v$datasetstats <- get_box_dataset_frequency(data_to_plot)
       
       data_to_table <- data_to_plot %>% spread(celltype, frequency) %>% select(-n)
       output$countTable <- get_count_table(data_to_table)
     }
   })
   
-  
+  observeEvent(input$getSampleCompApply,{
+    if(input$tab == "sampleComposition" & length(input$dataset) > 0 & !is.null(input$sample) & !is.null(input$celltype)) {
+      
+      data_to_plot <- reactiveCellCountData()
+      v$samplestats <- get_sample_composition(data_to_plot,input$sample, input$celltype)
+    }
+  })
   
   
   
@@ -400,21 +447,36 @@ server <- function(input, output, session) {
   })
   
   
-  v <- reactiveValues(dot = NULL, density = NULL, box = NULL, heatmap = NULL, cellbox = NULL, cellbar = NULL)
+######################################################################################
+############### GET DATA FROM REACTIVE SQL QUERIES ###################################
   
+  v <- reactiveValues(dot = NULL, 
+                      density = NULL, 
+                      box = NULL, 
+                      heatmap = NULL, 
+                      datasetstats = NULL, 
+                      samplestats = NULL, 
+                      cellbar = NULL)
+ 
+ 
+###### QUERY 1. 
   reactiveData <- reactive({
     if (is.null(input$sample) | is.null(input$celltype) | is.null(input$gene)) return()
     get_data(inputCellTypes, input$sample,input$celltype,input$gene, con_himc)
   })
+
   
+##### QUERY 2. collect cell subset statistics (count, freq, total_count) per selected datasets for ALL celltypes.
   reactiveCellCountData <- reactive({
     if (length(input$dataset) > 0) {
       get_cell_count_per_dataset(inputCellTypes,input$dataset)
     }
   })
   
-  ## NB: when working with SQL queries force local evaluation for the reactive variables: add !! before the variable.
+################################################################################
+#################### UPDATE SELECTIONN FIELDS UPON USER REQUEST ################
   
+  ## NB: when working with SQL queries force local evaluation for the reactive variables: add !! before the variable.
   outSample <- reactive({
     if (length(input$dataset > 0)) {
       inputDatasets %>% filter(dataset %in% !!input$dataset) %>% select(sample) %>% collect() %>% arrange(sample)
@@ -449,6 +511,9 @@ server <- function(input, output, session) {
     )
   })
   
+####################################################################################
+############################# REACTIVE VISUALS ###################################
+  
   output$exprDot <- renderPlotly({
     if (is.null(v$dot)) return()
     ggplotly(v$dot, width = cdata$output_pid_width, height = cdata$output_pid_height)
@@ -470,14 +535,64 @@ server <- function(input, output, session) {
   })
 
   output$countBox <- renderPlotly({
-    if (is.null(v$cellbox)) return()
-    ggplotly(v$cellbox, width = cdata$output_pid_width, height = cdata$output_pid_height)
+    if (is.null(v$datasetstats)) return()
+    ggplotly(v$datasetstats, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
+  
+  output$sampleStats <- renderPlotly({
+    if (is.null(v$samplestats)) return()
+    gp1 <- ggplotly(v$samplestats$p1, tooltip=c("text")) %>% add_annotations(
+      text = "<b>Total cell count</b>",
+      showlegend = FALSE,
+      x = 0.5,
+      y = 1,
+      yref = "paper",
+      xref = "paper",
+      xanchor = "center",
+      yanchor = "top",
+      yshift = 20,
+      showarrow = FALSE,
+      font = list(color = 'BLACK',
+                  size = 15)
+    )
+    gp2 <- ggplotly(v$samplestats$p2, tooltip=c("text")) %>% add_annotations(
+      text = "<b>Subset Composition</b>",
+      showlegend = TRUE,
+      x = 0.5,
+      y = 1,
+      yref = "paper",
+      xref = "paper",
+      xanchor = "center",
+      yanchor = "top",
+      yshift = 20,
+      showarrow = FALSE,
+      font = list(color = 'BLACK',
+                  size = 15)
+    )
+    gp3 <- ggplotly(v$samplestats$p3, tooltip=c("text")) %>% add_annotations(
+      text = "<b>Selected subsets</b>",
+      showlegend = FALSE,
+      x = 0.5,
+      y = 1,
+      yref = "paper",
+      xref = "paper",
+      xanchor = "center",
+      yanchor = "top",
+      yshift = 20,
+      showarrow = FALSE,
+      font = list(color = 'BLACK',
+                  size = 15)
+    )
+    subplot(gp1, gp2, gp3, nrows=1, shareX = FALSE, shareY = FALSE, titleX = TRUE, width = cdata$output_pid_width, height = cdata$output_pid_height)
+  })
+  
+
   
   output$countPerGeneBar <- renderPlotly({
     if (is.null(v$cellbar)) return()
     ggplotly(v$cellbar, width = cdata$output_pid_width, height = cdata$output_pid_height)
   })
+  
   
   
   

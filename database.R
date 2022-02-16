@@ -131,10 +131,17 @@ get_cell_count_per_dataset <- function(inputCellTypes,selected_datasets){
     count(dataset,sample,celltype) %>%
     group_by(dataset,sample) %>% 
     mutate(frequency = n / sum(n)) %>%
-    ungroup()
+    mutate(total_cell = sum(n)) %>%
+    ungroup() %>% 
+    arrange(desc(total_cell))  %>% 
+    mutate(sample_name = factor(sample, 
+                                levels = sample,
+                                labels = paste0(dataset, "\n", sample)))
   
   return(cellcounts)
 }
+
+
 
 
 

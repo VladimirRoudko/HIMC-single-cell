@@ -1,5 +1,6 @@
 #!/usr/bin/Rscript
-
+library("viridis")
+library("scales")
 
 #### visuals for interactive tables:
 
@@ -44,8 +45,8 @@ get_count_table <- function(input_table) {
 
 
 
-
-#### visuals of expression as dot plot:
+####################################################################
+################ VISUALS ON EXPRESSION TAB ###############
 
 get_dot_per_cell <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(x=gene, y=ncounts, fill = celltype)) +  
@@ -120,8 +121,9 @@ get_box_per_gene <- function(data_to_plot){
   return(plot)
 }
 
-
-
+####################################################################
+################# VISUALS ON CELLCOUNT TAB #################3
+### Visualize whole dataset composition with major cell types and cell counts per sample
 get_box_dataset_cellcount <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(x=celltype,y=n, fill=factor(dataset))) +  
     geom_boxplot() + 
@@ -137,6 +139,9 @@ get_box_dataset_cellcount <- function(data_to_plot){
   return(plot)
 }
 
+
+### Visualize whole dataset composition with major cell types and cell frequences per sample
+### NB! add split on metadata. Combine with count tab?
 get_box_dataset_frequency <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(x=celltype,y=frequency, fill=factor(dataset))) +  
     geom_boxplot() + 
@@ -152,6 +157,9 @@ get_box_dataset_frequency <- function(data_to_plot){
   return(plot)
 }
 
+### Visualize the  cell counts on gene-positive, gene-negative populations. per gene of interest, absolute counts in sample
+### NB! add relative frequency (per cell subset counts)
+### NB! add split on metadata. Combine with frequency tab?
 get_bar_gene_cellcount <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(fill=gene, y=count, x=celltype)) + 
     geom_bar(position="stack", stat="identity") +
@@ -165,6 +173,9 @@ get_bar_gene_cellcount <- function(data_to_plot){
   return(plot)
 }
 
+### Visualize the  cell counts on gene-positive, gene-negative populations. per gene of interest, use frequences
+### NB! add relative frequency (per cell subset counts)
+### NB! add split on metadata.
 get_bar_gene_frequency <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(fill=gene, y=frequency, x=celltype)) + 
     geom_bar(position="stack", stat="identity") +
@@ -178,6 +189,7 @@ get_bar_gene_frequency <- function(data_to_plot){
   return(plot)
 }
 
+### Visualize unscaled, average gene expression per cell subset using heatmap. 
 get_heatmap_expression_unscaled <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(gene, celltype)) + 
     geom_tile(aes(fill= mean), colour = "black", size=1) +
@@ -191,10 +203,11 @@ get_heatmap_expression_unscaled <- function(data_to_plot){
   return(plot)
 }
 
+
+### Visualize scaled, average gene expression per cell subset using heatmap. 
 get_heatmap_expression_scaled <- function(data_to_plot){
   plot <- ggplot(data_to_plot, aes(gene, celltype)) + 
     geom_tile(aes(fill= mean_scaled), colour = "black", size=1) +
-#    scale_fill_distiller(palette = 'RdBu', direction = -1) +
     scale_fill_viridis_c(option = "D", direction = 1) +
     facet_wrap(~dataset+sample) +
     theme(panel.spacing = unit(.05, "lines"), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5), 
@@ -206,8 +219,72 @@ get_heatmap_expression_scaled <- function(data_to_plot){
 }
 
 
-
-
+### Visualize sample composition on SampleCompotision tab. 
+### Use data_to plot derived from  get_cell_count_per_dataset() function
+get_sample_composition <- function(data_to_plot, selected_sample, selected_celltype){
+  
+  p1_data <- data_to_plot %>% select(dataset,sample,sample_name,total_cell) %>% distinct() %>% filter(sample %in% selected_sample)
+  
+  p1 <- ggplot(p1_data, aes(y=sample_name,x=total_cell,text = paste(
+    "count:", ..x..,
+    "<br>sample: ", ..y..)
+  )) + 
+    geom_bar(stat='identity') + xlab("Cell count") +
+    theme(
+      plot.title = element_text(color="black", size=12, face="bold", hjust=0.5),
+      axis.title.y=element_blank(),
+      axis.text.x = element_text(angle = 0, color="black"),
+      axis.text.y = element_text(angle = 0, color="black")
+    ) + scale_x_continuous(labels = label_scientific(digits = 1))
+  
+  ### define colour schema for celltypes in queried samples
+  viridis_pal(option = "D")(length(unique(data_to_plot$celltype)))
+  colours <- data.frame(sort(unique(data_to_plot$celltype)),viridis_pal(option = "D", direction = -1)(length(unique(data_to_plot$celltype))))
+  colnames(colours) <- c("celltype","color")
+  selection <- data_to_plot %>% select(dataset,sample,celltype, frequency) %>% filter(celltype %in% selected_celltype)
+  colours_selection <- colours %>% right_join(selection) %>% select(-c(dataset,sample,frequency)) %>% unique()
+  
+  p2_data <- data_to_plot %>% select(dataset,sample, sample_name,celltype, frequency) %>% filter(sample %in% selected_sample) %>% mutate(celltype = factor(celltype, levels=colours$celltype))
+  p3_data <- data_to_plot %>% select(dataset,sample,sample_name,total_cell) %>% filter(sample %in% selected_sample) %>% distinct() %>% left_join(selection) %>% mutate(celltype = factor(celltype, levels=colours_selection$celltype))
+  
+  p2 <- ggplot(p2_data, aes(x=frequency, y=sample_name, fill=celltype, text = paste(
+    "frequency:", ..x..,
+    "<br>celltype", ..fill..,
+    "<br>sample: ", ..y..))) +
+    geom_bar(position="stack", stat='identity', color="black") +
+    xlab("Celltype frequencies") + 
+    theme(
+      plot.title = element_text(color="black", size=12, face="bold", hjust=0.5),
+      legend.position='right',
+      legend.title = element_text(colour="black", face="bold"),
+      axis.title.y=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank()
+    ) +
+    scale_x_continuous(labels = comma) +
+    scale_fill_manual(values = colours$color)
+  
+  p3<- ggplot(p3_data, aes(y=sample_name,x=frequency, fill=celltype, text = paste(
+    "frequency:", ..x..,
+    "<br>celltype", ..fill..,
+    "<br>sample: ", ..y..))) + 
+    xlab("Selected celltype frequency") + xlim(0, 1) +
+    geom_bar(position="stack", stat='identity', color="black") + 
+    theme(
+      plot.title = element_text(color="black", size=12, face="bold", hjust=0.5),
+      axis.text.x = element_text(angle = 0),
+      legend.position='right',
+      legend.title = element_text(colour="black", face="bold"),
+      axis.title.y=element_blank(),
+      axis.ticks.y=element_blank(),
+      axis.text.y=element_blank()
+    ) + 
+    scale_fill_manual(values = colours_selection$color)
+  
+  my_list <- list("p1" = p1,"p2" = p2,"p3" = p3)
+  
+  return(my_list)
+}
 
 
 
