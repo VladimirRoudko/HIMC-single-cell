@@ -81,7 +81,8 @@ get_data <- function(inputCellTypes, samples,celltypes,genes, my_con_sql) {
     select(-geneID) %>% 
     collect() %>% drop_na()
   
-  expression_sample <- selected %>% group_by(dataset,sample,celltype,gene) %>% slice_sample(n=200) %>% ungroup()
+  #### check the sampling! do not allow replacement, if sample is below ## used slice_sample n=200
+  expression_sample <- selected %>% group_by(dataset,sample,celltype,gene) %>% sample_frac(0.2) %>% ungroup()
   
   positive_counts <- selected %>% filter(ncounts > 0) %>% 
     group_by(sampleID,celltype,barcodeID) %>% 

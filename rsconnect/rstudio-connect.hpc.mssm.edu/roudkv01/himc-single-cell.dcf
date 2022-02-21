@@ -1,0 +1,13 @@
+name: himc-single-cell
+title: HIMC-single-cell
+username: roudkv01
+account: roudkv01
+server: rstudio-connect.hpc.mssm.edu
+hostUrl: https://rstudio-connect.hpc.mssm.edu/__api__
+appId: 86
+bundleId: 331
+url: https://rstudio-connect.hpc.mssm.edu/content/86/
+when: 1645139308.51656
+lastSyncTime: 1645139308.51664
+asMultiple: FALSE
+asStatic: FALSE
